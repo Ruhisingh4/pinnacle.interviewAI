@@ -1,51 +1,20 @@
-import streamlit as st
-from openai import OpenAI
-import PyPDF2
-from nlp_utils import extract_skills
-
-# Use Streamlit's secrets management to get the API key
-client = OpenAI(api_key=st.secrets["openai"]["api_key"])
-
+// ... existing code ...
+# -----------------------------
+# PAGE CONFIG
+# -----------------------------
 st.set_page_config(
-    page_title="PinnacleInterviewAI",
+    page_title="AIVEE 🤖 – AI HR Mock Interviewer",
     page_icon="🤖",
     layout="centered",
-    initial_sidebar_state="collapsed",
 )
-
-# -----------------------------
-# Initialize session state
-# -----------------------------
-if "user_name" not in st.session_state:
-    st.session_state.user_name = ""
-
-if "user_college" not in st.session_state:
-    st.session_state.user_college = ""
-
-if "current_question_index" not in st.session_state:
-    st.session_state.current_question_index = 0
-
-if "questions" not in st.session_state:
-    st.session_state.questions = []
-
-if "skills" not in st.session_state:
-    st.session_state.skills = []
-
-if "answers" not in st.session_state:
-    st.session_state.answers = []
-
-if "feedback" not in st.session_state:
-    st.session_state.feedback = []
 
 # -----------------------------
 # LOGIN
 # -----------------------------
-# -----------------------------\n# LOGIN\n# -----------------------------\nif st.session_state.user_name == "":
-#     st.title("AIVEE 🤖 – AI HR Mock Interviewer")
-#     st.session_state.user_name = st.text_input("Enter your name to start:", "")
-#     st.session_state.user_college = st.text_input("Enter your college name:", "")
-    if st.session_state.user_name != "" and st.session_state.user_college != "":
-        st.success(f"Hello {st.session_state.user_name} from {st.session_state.user_college}! Upload your resume to begin.")
+if not st.session_state.user_name:
+    st.title("AIVEE 🤖 – AI HR Mock Interviewer")
+    name = st.text_input("Enter your name to start:")
+    college = st.text_input("Enter your college name:")
 else:
     st.title(f"Hello {st.session_state.user_name}, let's start your mock interview!")
 
@@ -85,28 +54,39 @@ else:
         user_answer = st.text_area(current_q, key=st.session_state.current_question_index)
 
         if st.button("Submit Answer"):
-            st.session_state.answers.append(user_answer)
+            if user_answer:
+                st.session_state.answers.append(user_answer)
 
-            # Generate dynamic feedback
-            with st.spinner("Generating feedback..."):
-                prompt = f"Question: {current_q}\nAnswer: {user_answer}\n\nProvide constructive feedback on this answer for a job interview in 2-3 sentences."
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are an expert HR interviewer providing feedback."},
-                        {"role": "user", "content": prompt}
-                    ]
-                )
-                feedback_text = response.choices[0].message.content.strip()
-            
-            st.session_state.feedback.append(feedback_text)
-            st.session_state.current_question_index += 1
-            st.success(f"AIVEE 🤖: {feedback_text}")
+                # Generate dynamic feedback
+                with st.spinner("AIVEE 🤖 is generating feedback..."):
+                    prompt = f"Question: {current_q}\\nAnswer: {user_answer}\\n\\nProvide constructive feedback on this answer for a job interview in 2-3 sentences. Address the user directly."
+                    response = client.chat.completions.create(
+                        model="gpt-3.5-turbo",
+                        messages=[
+                            {"role": "system", "content": "You are an expert HR interviewer providing feedback. Your name is AIVEE."},
+                            {"role": "user", "content": prompt}
+                        ]
+                    )
+                    feedback_text = response.choices[0].message.content.strip()
+                
+                st.session_state.feedback.append(feedback_text)
+                st.session_state.current_question_index += 1
+                st.rerun()
+            else:
+                st.warning("Please provide an answer before submitting.")
 
-    elif st.session_state.current_question_index >= len(st.session_state.questions):
+    # --- INTERVIEW COMPLETION ---
+    else:
         st.success("🎉 You have completed the mock interview!")
-        st.write("### Your Answers:")
+        st.balloons()
+        st.write("### Final Report:")
         for i, ans in enumerate(st.session_state.answers):
-            st.write(f"Q{i+1}: {st.session_state.questions[i]}")
-            st.write(f"Your Answer: {ans}")
-            st.write(f"AIVEE 🤖: {st.session_state.feedback[i]}")
+            with st.expander(f"Q{i+1}: {st.session_state.questions[i]}"):
+                st.write(f"**Your Answer:** {ans}")
+                st.write(f"**AIVEE 🤖's Feedback:** {st.session_state.feedback[i]}")
+
+        if st.button("Start New Interview"):
+            # Clear session state to restart
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()

@@ -1,24 +1,26 @@
-# -----------------------------
-# Pinnacle AI HR Mock Interviewer (Offline)
-# -----------------------------
-from dotenv import load_dotenv
-import os
-
-load_dotenv()  # loads .env variables
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-from openai import OpenAI
-client = OpenAI(api_key=OPENAI_API_KEY)
-
 import streamlit as st
+from openai import OpenAI
 import PyPDF2
 from nlp_utils import extract_skills
+
+# Use Streamlit's secrets management to get the API key
+client = OpenAI(api_key=st.secrets["openai"]["api_key"])
+
+st.set_page_config(
+    page_title="PinnacleInterviewAI",
+    page_icon="🤖",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+)
 
 # -----------------------------
 # Initialize session state
 # -----------------------------
 if "user_name" not in st.session_state:
     st.session_state.user_name = ""
+
+if "user_college" not in st.session_state:
+    st.session_state.user_college = ""
 
 if "current_question_index" not in st.session_state:
     st.session_state.current_question_index = 0
@@ -41,8 +43,9 @@ if "feedback" not in st.session_state:
 if st.session_state.user_name == "":
     st.title("🤖 Pinnacle – AI HR Mock Interviewer (Offline)")
     st.session_state.user_name = st.text_input("Enter your name to start:", "")
-    if st.session_state.user_name != "":
-        st.success(f"Hello {st.session_state.user_name}! Upload your resume to begin.")
+    st.session_state.user_college = st.text_input("Enter your college name:", "")
+    if st.session_state.user_name != "" and st.session_state.user_college != "":
+        st.success(f"Hello {st.session_state.user_name} from {st.session_state.user_college}! Upload your resume to begin.")
 else:
     st.title(f"Hello {st.session_state.user_name}, let's start your mock interview!")
 
@@ -52,7 +55,6 @@ else:
     uploaded_file = st.file_uploader("Upload Resume (PDF)", type=["pdf"])
 
     if uploaded_file and not st.session_state.skills:
-        # Extract text
         pdf_reader = PyPDF2.PdfReader(uploaded_file)
         resume_text = ""
         for page in pdf_reader.pages:
@@ -63,7 +65,7 @@ else:
         st.session_state.skills = skills
         st.write("Detected Skills:", ", ".join(skills[:10]))
 
-        # Predefined questions (offline)
+        # Predefined questions based on top skills
         top_skills = skills[:5] if len(skills) >= 5 else skills
         st.session_state.questions = [
             f"Can you explain your experience with {top_skills[0]}?",
@@ -75,17 +77,6 @@ else:
             "How do you handle tight deadlines and multiple tasks in a project?"
         ]
 
-        # Predefined feedback for each question (you can customize)
-        st.session_state.feedback = [
-            "Great! Your experience sounds solid.",
-            "Good application, it shows practical knowledge.",
-            "Excellent problem-solving approach.",
-            "Nice, familiarity with tools is important.",
-            "Good to keep learning and staying updated.",
-            "Well done, projects showcase skills.",
-            "Good time management and prioritization skills."
-        ]
-
     # -----------------------------
     # INTERVIEW FLOW
     # -----------------------------
@@ -94,11 +85,21 @@ else:
         user_answer = st.text_area(current_q, key=st.session_state.current_question_index)
 
         if st.button("Submit Answer"):
-            # Store user's answer
             st.session_state.answers.append(user_answer)
 
-            # Provide offline feedback
-            feedback_text = st.session_state.feedback[st.session_state.current_question_index]
+            # Generate dynamic feedback
+            with st.spinner("Generating feedback..."):
+                prompt = f"Question: {current_q}\nAnswer: {user_answer}\n\nProvide constructive feedback on this answer for a job interview in 2-3 sentences."
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are an expert HR interviewer providing feedback."},
+                        {"role": "user", "content": prompt}
+                    ]
+                )
+                feedback_text = response.choices[0].message.content.strip()
+            
+            st.session_state.feedback.append(feedback_text)
             st.session_state.current_question_index += 1
             st.success(f"🤖 Interviewer Feedback: {feedback_text}")
 

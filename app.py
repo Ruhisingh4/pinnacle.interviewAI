@@ -1,4 +1,8 @@
-// ... existing code ...
+import streamlit as st
+import openai
+import PyPDF2
+from nlp_utils import extract_skills
+
 # -----------------------------
 # PAGE CONFIG
 # -----------------------------
@@ -9,49 +13,87 @@ st.set_page_config(
 )
 
 # -----------------------------
+# API KEY
+# -----------------------------
+# Use st.secrets for securely managing the API key
+try:
+    client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
+except Exception as e:
+    st.error(f"Error initializing OpenAI client: {e}")
+    st.stop()
+
+
+# -----------------------------
+# SESSION STATE
+# -----------------------------
+if "user_name" not in st.session_state:
+    st.session_state.user_name = ""
+if "user_college" not in st.session_state:
+    st.session_state.user_college = ""
+if "skills" not in st.session_state:
+    st.session_state.skills = []
+if "questions" not in st.session_state:
+    st.session_state.questions = []
+if "answers" not in st.session_state:
+    st.session_state.answers = []
+if "feedback" not in st.session_state:
+    st.session_state.feedback = []
+if "current_question_index" not in st.session_state:
+    st.session_state.current_question_index = 0
+
+
+# -----------------------------
 # LOGIN
 # -----------------------------
 if not st.session_state.user_name:
     st.title("AIVEE 🤖 – AI HR Mock Interviewer")
     name = st.text_input("Enter your name to start:")
     college = st.text_input("Enter your college name:")
+    if st.button("Start Interview"):
+        if name and college:
+            st.session_state.user_name = name
+            st.session_state.user_college = college
+            st.rerun()
+        else:
+            st.warning("Please enter both your name and college.")
 else:
-    st.title(f"Hello {st.session_state.user_name}, let's start your mock interview!")
-
     # -----------------------------
-    # RESUME UPLOAD
+    # MAIN APP
     # -----------------------------
-    uploaded_file = st.file_uploader("Upload Resume (PDF)", type=["pdf"])
+    st.title(f"Hello {st.session_state.user_name}, let's begin!")
 
-    if uploaded_file and not st.session_state.skills:
-        pdf_reader = PyPDF2.PdfReader(uploaded_file)
-        resume_text = ""
-        for page in pdf_reader.pages:
-            resume_text += page.extract_text() or ""
+    # --- RESUME UPLOAD & SKILL EXTRACTION ---
+    if not st.session_state.skills:
+        uploaded_file = st.file_uploader("Upload Your Resume (PDF) to tailor the questions", type=["pdf"])
+        if uploaded_file:
+            with st.spinner("Analyzing your resume..."):
+                try:
+                    pdf_reader = PyPDF2.PdfReader(uploaded_file)
+                    resume_text = ""
+                    for page in pdf_reader.pages:
+                        resume_text += page.extract_text() or ""
+                    
+                    skills = extract_skills(resume_text)
+                    st.session_state.skills = skills
+                    st.write("Detected Skills:", ", ".join(skills[:10]))
 
-        # Extract skills
-        skills = extract_skills(resume_text)
-        st.session_state.skills = skills
-        st.write("Detected Skills:", ", ".join(skills[:10]))
+                    # Generate questions based on skills
+                    top_skills = skills[:5] if len(skills) >= 5 else skills
+                    st.session_state.questions = [
+                        f"Can you explain your experience with {top_skills[0]}?",
+                        f"How have you applied {top_skills[1]} in your projects?",
+                        f"Describe a challenge you faced using {top_skills[2]} and how you solved it.",
+                        "Tell me about a project where you demonstrated problem-solving skills.",
+                        "How do you handle tight deadlines and multiple tasks?"
+                    ]
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error processing PDF: {e}")
 
-        # Predefined questions based on top skills
-        top_skills = skills[:5] if len(skills) >= 5 else skills
-        st.session_state.questions = [
-            f"Can you explain your experience with {top_skills[0]}?",
-            f"How have you applied {top_skills[1]} in your projects?",
-            f"Describe a challenge you faced using {top_skills[2]} and how you solved it.",
-            f"What tools or frameworks have you used for {top_skills[3]}?",
-            f"How do you stay updated on {top_skills[4]}?",
-            "Tell me about a project where you demonstrated problem-solving skills.",
-            "How do you handle tight deadlines and multiple tasks in a project?"
-        ]
-
-    # -----------------------------
-    # INTERVIEW FLOW
-    # -----------------------------
+    # --- INTERVIEW FLOW ---
     if st.session_state.skills and st.session_state.current_question_index < len(st.session_state.questions):
         current_q = st.session_state.questions[st.session_state.current_question_index]
-        user_answer = st.text_area(current_q, key=st.session_state.current_question_index)
+        user_answer = st.text_area(f"Question {st.session_state.current_question_index + 1}/{len(st.session_state.questions)}: {current_q}", key=f"q_{st.session_state.current_question_index}")
 
         if st.button("Submit Answer"):
             if user_answer:
@@ -76,7 +118,7 @@ else:
                 st.warning("Please provide an answer before submitting.")
 
     # --- INTERVIEW COMPLETION ---
-    else:
+    elif st.session_state.skills:
         st.success("🎉 You have completed the mock interview!")
         st.balloons()
         st.write("### Final Report:")

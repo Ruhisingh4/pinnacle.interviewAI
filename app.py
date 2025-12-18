@@ -104,14 +104,14 @@ else:
                 # Generate dynamic feedback
                 with st.spinner("AIVEE 🤖 is generating feedback..."):
                     try:
-                        prompt = f\"\"\"Question: {current_q}
+                        prompt = f"""Question: {current_q}
 Answer: {user_answer}
 
 Provide a score for this answer on a scale of 1 to 10, where 1 is poor and 10 is excellent. Then, provide constructive feedback on this answer for a job interview in 2-3 sentences. Address the user directly. Format your response as follows:
 
 Score: [Your Score]/10
 
-Feedback: [Your Feedback]\"\"\"
+Feedback: [Your Feedback]"""
                         response = client.chat.completions.create(
                             model="gpt-3.5-turbo",
                             messages=[
@@ -122,8 +122,8 @@ Feedback: [Your Feedback]\"\"\"
                         full_response = response.choices[0].message.content.strip()
                         
                         # Parse score and feedback
-                        score_line = full_response.split('\\n')[0]
-                        feedback_text = '\\n'.join(full_response.split('\\n')[2:])
+                        score_line = full_response.split('\n')[0]
+                        feedback_text = '\n'.join(full_response.split('\n')[2:])
                         score = score_line.replace("Score: ", "").strip()
 
                     except openai.RateLimitError:

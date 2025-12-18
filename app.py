@@ -3,18 +3,18 @@ import openai
 import PyPDF2
 from nlp_utils import extract_skills
 
-# -----------------------------
+# ----------------------------
 # PAGE CONFIG
-# -----------------------------
+# ----------------------------
 st.set_page_config(
     page_title="AIVEE 🤖 – AI HR Mock Interviewer",
     page_icon="🤖",
     layout="centered",
 )
 
-# -----------------------------
+# ----------------------------
 # API KEY
-# -----------------------------
+# ----------------------------
 # Use st.secrets for securely managing the API key
 try:
     client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
@@ -23,9 +23,9 @@ except Exception as e:
     st.stop()
 
 
-# -----------------------------
+# ----------------------------
 # SESSION STATE
-# -----------------------------
+# ----------------------------
 if "user_name" not in st.session_state:
     st.session_state.user_name = ""
 if "user_college" not in st.session_state:
@@ -38,13 +38,15 @@ if "answers" not in st.session_state:
     st.session_state.answers = []
 if "feedback" not in st.session_state:
     st.session_state.feedback = []
+if "scores" not in st.session_state:
+    st.session_state.scores = []
 if "current_question_index" not in st.session_state:
     st.session_state.current_question_index = 0
 
 
-# -----------------------------
+# ----------------------------
 # LOGIN
-# -----------------------------
+# ----------------------------
 if not st.session_state.user_name:
     st.title("AIVEE 🤖 – AI HR Mock Interviewer")
     name = st.text_input("Enter your name to start:")
@@ -57,9 +59,9 @@ if not st.session_state.user_name:
         else:
             st.warning("Please enter both your name and college.")
 else:
-    # -----------------------------
+    # ----------------------------
     # MAIN APP
-    # -----------------------------
+    # ----------------------------
     st.title(f"Hello {st.session_state.user_name}, let's begin!")
 
     # --- RESUME UPLOAD & SKILL EXTRACTION ---
@@ -102,22 +104,38 @@ else:
                 # Generate dynamic feedback
                 with st.spinner("AIVEE 🤖 is generating feedback..."):
                     try:
-                        prompt = f"Question: {current_q}\\nAnswer: {user_answer}\\n\\nProvide constructive feedback on this answer for a job interview in 2-3 sentences. Address the user directly."
+                        prompt = f\"\"\"Question: {current_q}
+Answer: {user_answer}
+
+Provide a score for this answer on a scale of 1 to 10, where 1 is poor and 10 is excellent. Then, provide constructive feedback on this answer for a job interview in 2-3 sentences. Address the user directly. Format your response as follows:
+
+Score: [Your Score]/10
+
+Feedback: [Your Feedback]\"\"\"
                         response = client.chat.completions.create(
                             model="gpt-3.5-turbo",
                             messages=[
-                                {"role": "system", "content": "You are an expert HR interviewer providing feedback. Your name is AIVEE."},
+                                {"role": "system", "content": "You are an expert HR interviewer providing feedback and scores. Your name is AIVEE."},
                                 {"role": "user", "content": prompt}
                             ]
                         )
-                        feedback_text = response.choices[0].message.content.strip()
+                        full_response = response.choices[0].message.content.strip()
+                        
+                        # Parse score and feedback
+                        score_line = full_response.split('\\n')[0]
+                        feedback_text = '\\n'.join(full_response.split('\\n')[2:])
+                        score = score_line.replace("Score: ", "").strip()
+
                     except openai.RateLimitError:
                         feedback_text = "I'm experiencing high demand right now. Please check your OpenAI account for billing and usage details. You may need to wait a bit before trying again."
+                        score = "N/A"
                     except Exception as e:
                         st.error(f"An error occurred while generating feedback: {e}")
                         feedback_text = "Sorry, I was unable to generate feedback for this answer."
+                        score = "N/A"
                 
                 st.session_state.feedback.append(feedback_text)
+                st.session_state.scores.append(score)
                 st.session_state.current_question_index += 1
                 st.rerun()
             else:
@@ -132,6 +150,7 @@ else:
             with st.expander(f"Q{i+1}: {st.session_state.questions[i]}"):
                 st.write(f"**Your Answer:** {ans}")
                 st.write(f"**AIVEE 🤖's Feedback:** {st.session_state.feedback[i]}")
+                st.write(f"**Score:** {st.session_state.scores[i]}")
 
         if st.button("Start New Interview"):
             # Clear session state to restart

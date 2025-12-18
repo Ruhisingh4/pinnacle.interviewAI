@@ -40,10 +40,10 @@ if "feedback" not in st.session_state:
 # -----------------------------
 # LOGIN
 # -----------------------------
-if st.session_state.user_name == "":
-    st.title("🤖 Pinnacle – AI HR Mock Interviewer (Offline)")
-    st.session_state.user_name = st.text_input("Enter your name to start:", "")
-    st.session_state.user_college = st.text_input("Enter your college name:", "")
+# -----------------------------\n# LOGIN\n# -----------------------------\nif st.session_state.user_name == "":
+#     st.title("AIVEE 🤖 – AI HR Mock Interviewer")
+#     st.session_state.user_name = st.text_input("Enter your name to start:", "")
+#     st.session_state.user_college = st.text_input("Enter your college name:", "")
     if st.session_state.user_name != "" and st.session_state.user_college != "":
         st.success(f"Hello {st.session_state.user_name} from {st.session_state.user_college}! Upload your resume to begin.")
 else:
@@ -101,7 +101,7 @@ else:
             
             st.session_state.feedback.append(feedback_text)
             st.session_state.current_question_index += 1
-            st.success(f"🤖 Interviewer Feedback: {feedback_text}")
+            st.success(f"AIVEE 🤖: {feedback_text}")
 
     elif st.session_state.current_question_index >= len(st.session_state.questions):
         st.success("🎉 You have completed the mock interview!")
@@ -109,4 +109,4 @@ else:
         for i, ans in enumerate(st.session_state.answers):
             st.write(f"Q{i+1}: {st.session_state.questions[i]}")
             st.write(f"Your Answer: {ans}")
-            st.write(f"Feedback: {st.session_state.feedback[i]}")
+            st.write(f"AIVEE 🤖: {st.session_state.feedback[i]}")
